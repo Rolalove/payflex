@@ -30,24 +30,24 @@ export function PayoutSetupAlert() {
   if (!checked || !show) return null;
 
   return (
-    <div className="bg-[#E2E9ED] flex-col lg:flex-row border border-[#10367D] rounded-xl p-4 flex items-center justify-between mb-8 shadow-sm">
-      <div className="flex flex-row items-center gap-4">
-        <div className="bg-[#FFC107] p-2 rounded-full">
-          <BsExclamationTriangle fill="#ffffff" size={16} />
+    <div className="bg-[#E2E9ED] border border-[#10367D] rounded-xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between mb-10 gap-6 shadow-sm">
+      <div className="flex flex-row items-start gap-4">
+        <div className="bg-[#FFC107] p-2.5 rounded-full shrink-0 mt-1">
+          <BsExclamationTriangle fill="#ffffff" size={20} />
         </div>
-        <div className="flex flex-col lg:flex-row">
+        <div>
           <h3 className="font-medium text-lg text-[#000000]">Complete payout setup</h3>
-          <p className="text-base font-normal text-[#000000] mt-0.5">
-            Add a bank account to receive released funds from your splits and escrows.
+          <p className="text-base font-normal text-gray-600 mt-1 leading-relaxed max-w-md">
+            Add a bank account to receive released funds from your splits and escrows. This is required for withdrawals.
           </p>
         </div>
       </div>
       <Link
         href="/dashboard/settings?tab=bank"
-        className="flex items-start lg:items-center gap-2 border border-[#10367D] text-[#10367D] p-3  rounded-full text-base font-normal whitespace-nowrap"
+        className="w-full md:w-auto flex items-center justify-center gap-2 border border-[#10367D] text-[#10367D] px-6 py-3 rounded-full text-sm font-medium hover:bg-[#10367D]/5 transition-all active:scale-[0.98] whitespace-nowrap"
       >
         Setup bank
-        <LuArrowUpRight size={16} />
+        <LuArrowUpRight size={18} />
       </Link>
     </div>
   );

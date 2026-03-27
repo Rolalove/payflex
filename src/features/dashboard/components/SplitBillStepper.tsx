@@ -77,7 +77,7 @@ export function SplitBillStepper({ status }: SplitBillStepperProps) {
               <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 ${circleClass} ${step.isActive && !step.isError ? 'ring-4 ring-blue-50' : ''}`}>
                 <Icon size={20} className={`${iconClass} ${step.isActive && step.id === 2 && !isDisputed ? 'animate-pulse' : ''}`} />
               </div>
-              <span className={`${labelClass} ${step.isError ? 'text-red-600' : (step.isDone || step.isActive) ? 'text-gray-900' : 'text-gray-400'}`}>
+              <span className={`hidden sm:block ${labelClass} ${step.isError ? 'text-red-600' : (step.isDone || step.isActive) ? 'text-gray-900' : 'text-gray-400'}`}>
                 {step.label}
               </span>
             </div>

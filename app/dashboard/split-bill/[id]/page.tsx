@@ -112,42 +112,28 @@ export default function SplitBillDetailsPage({ params }: { params: Promise<{ id:
       return;
     }
 
-    const amountInKobo = Math.round(participant.amount_owed * 100);
     const txnRef = `FP-SB-${id.slice(0, 8)}-${participant.id.slice(0, 8)}-${Date.now()}`;
     
-    const request = {
-      merchant_code: process.env.NEXT_PUBLIC_INTERSWITCH_MERCHANT_CODE || 'MX6072',
-      pay_item_id: process.env.NEXT_PUBLIC_INTERSWITCH_PAY_ITEM_ID || '9405967',
-      txn_ref: txnRef,
-      amount: amountInKobo,
-      currency: 566,
-      cust_email: user?.email || 'customer@payflex.com',
-      mode: 'TEST',
-      onComplete: async (resp: any) => {
-        console.log('[PAYMENT] Interswitch complete:', resp);
-        setPayingId(participant.id);
-        const result = await verifyPaymentOnServer(txnRef, amountInKobo);
-        if (result.success) {
-          await supabase.from('transaction_participants').update({ 
-            amount_paid: participant.amount_owed, 
-            paid_at: new Date().toISOString() 
-          }).eq('id', participant.id);
+    // Use the robust handlePayment utility instead of manual implementation
+    import('@/src/components/ui/InterswitchCheckout').then(({ handlePayment }) => {
+      handlePayment({
+        amountNaira: participant.amount_owed,
+        payItemName: `Split Bill: ${title}`,
+        txnRef,
+        participantId: participant.id,
+        custEmail: user?.email || undefined,
+        onSuccess: () => {
           showToast("Payment confirmed!", "success");
           fetchData();
-        } else {
-          showToast(result.error || "Payment verification failed", "error");
+        },
+        onFailure: (err) => {
+          showToast(err || "Payment failed", "error");
         }
-        setPayingId(null);
-      },
-    };
-
-    console.log('[PAYMENT] Request payload:', request);
-    try {
-      (window as any).webpayCheckout(request);
-    } catch (err) {
-      console.error('[PAYMENT] Execution error:', err);
-      showToast("Unexpected payment error", "error");
-    }
+      });
+    }).catch(err => {
+      console.error('[PAYMENT] Refactor error:', err);
+      showToast("Could not load payment system", "error");
+    });
   };
 
   const handleRelease = async () => {
@@ -232,13 +218,13 @@ export default function SplitBillDetailsPage({ params }: { params: Promise<{ id:
                 </p>
               </div>
               
-              <div className="flex flex-col items-start sm:items-end bg-white/40 p-3 rounded-2xl backdrop-blur-sm">
+              <div className="flex-1 min-w-0 flex flex-col items-start sm:items-end">
                 <p className="text-[9px] text-gray-400 font-extrabold uppercase mb-2 tracking-widest">Recipient</p>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-white text-[11px] font-black shadow-inner border-2 border-white">
+                <div className="flex items-center gap-2 w-full sm:justify-end">
+                  <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center text-white text-[11px] font-black shadow-inner border-2 border-white shrink-0">
                     {getInitial(recipient.name)}
                   </div>
-                  <span className="text-sm font-black text-gray-900 truncate max-w-[100px]">{recipient.name}</span>
+                  <span className="text-sm font-black text-gray-900 truncate" title={recipient.name}>{recipient.name}</span>
                 </div>
               </div>
             </div>
@@ -252,8 +238,8 @@ export default function SplitBillDetailsPage({ params }: { params: Promise<{ id:
 
           {/* Participants Table Section */}
           <div className="mt-10">
-            <div className="overflow-x-auto lg:overflow-visible -mx-4 lg:mx-0 px-4 lg:px-0">
-              <div className="min-w-[550px] lg:min-w-0">
+            <div className="overflow-x-auto lg:overflow-visible bg-white/20 rounded-2xl">
+              <div className="min-w-[600px] lg:min-w-0 p-1">
                 <div className="grid grid-cols-4 px-4 pb-4 border-b border-gray-100 mb-2">
                   {['PARTICIPANTS', 'AMOUNT', 'STATUS', 'ACTION'].map((h, i) => (
                     <div key={h} className={`text-[10px] font-black text-gray-400 tracking-widest ${i === 1 || i === 2 ? 'text-center' : i === 3 ? 'text-right' : ''}`}>

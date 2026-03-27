@@ -65,7 +65,7 @@ export default function EscrowDetailPage({ params }: { params: Promise<{ id: str
   const dateStr = new Date(created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-2xl font-medium text-foreground">Escrow Details</h2>
