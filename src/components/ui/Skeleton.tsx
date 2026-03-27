@@ -74,3 +74,21 @@ export function DetailsSkeleton() {
     </div>
   );
 }
+export function ActivitySkeleton() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center justify-between p-4 bg-white/50 rounded-2xl">
+          <div className="flex items-center gap-4">
+            <Skeleton variant="circular" className="w-10 h-10" />
+            <div>
+              <Skeleton variant="text" className="h-4 w-48 mb-2" />
+              <Skeleton variant="text" className="h-3 w-32" />
+            </div>
+          </div>
+          <Skeleton variant="text" className="h-4 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}

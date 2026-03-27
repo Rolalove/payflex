@@ -21,10 +21,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-bold text-foreground tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">Manage your personal information and payout preferences.</p>
-      </div>
+      {/* Local title removed - managed by global Header */}
 
       <div className="bg-sidebar-bg border border-border rounded-3xl p-2 md:p-4 shadow-sm min-h-[600px] flex flex-col">
         {/* Tabs Navigation */}

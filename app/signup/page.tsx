@@ -13,7 +13,7 @@ export default function SignupPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) console.error("Error logging in:", error.message);
@@ -73,7 +73,8 @@ export default function SignupPage() {
 
               <div className="pt-2">
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={() => alert("coming soon kindly use signup with google")}
                   className="w-full bg-[#10367D] hover:bg-blue-900 text-white font-medium rounded-full py-4 transition-colors"
                 >
                   Sign up

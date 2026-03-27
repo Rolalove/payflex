@@ -2,18 +2,30 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/src/utils/supabase/client";
+import { formatCurrency, timeAgo } from "@/src/utils/format";
+import { useAuth } from "@/src/providers/AuthProvider";
 import { TransactionSkeleton, DetailsSkeleton } from "@/src/components/ui/Skeleton";
+import { EmptyActivityView } from "./EmptyActivityView";
 
-export function ActiveTransactions() {
+interface ActiveTransactionsProps {
+  hideHeader?: boolean;
+}
+
+export function ActiveTransactions({ hideHeader = false }: ActiveTransactionsProps) {
+  const { user, isLoading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Derive consolidated loading state
+  const isLoading = authLoading || (user && dataLoading);
 
   useEffect(() => {
     async function fetchTransactions() {
+      if (!user) {
+        return;
+      }
+      setDataLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
         const { data, error } = await supabase
           .from('transactions')
           .select(`
@@ -21,32 +33,45 @@ export function ActiveTransactions() {
             transaction_participants(*)
           `)
           .order('created_at', { ascending: false });
+          // Note: RLS handles the security filtering for creator/participant access.
+          // We removed the complex .or filter and !inner join to avoid duplicate row issues
+          // and ensure reliable fetching while RLS remains the source of truth.
 
         if (error) throw error;
         setTransactions(data || []);
       } catch (err) {
         console.error("Error fetching transactions:", err);
       } finally {
-        setIsLoading(false);
+        setDataLoading(false);
       }
     }
 
     fetchTransactions();
 
-    // Set up realtime subscription
+    if (!user) return;
+
+    // Set up targeted realtime subscription
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel(`active-tx-${user.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'transactions' },
-        () => fetchTransactions()
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'transactions' 
+        },
+        (payload) => {
+          // If the change didn't involve our ID, we might skip it (though RLS should handle it)
+          // For now, full refetch is fine but the channel is scoped.
+          fetchTransactions();
+        }
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [user]);
 
   if (isLoading) {
     return (
@@ -58,25 +83,25 @@ export function ActiveTransactions() {
     );
   }
 
-  if (transactions.length === 0) {
-    return (
-      <div className="bg-[#f2f4f7] rounded-3xl p-8 text-center">
-        <p className="text-gray-500 font-medium">No active transactions yet.</p>
-        <p className="text-xs text-gray-400 mt-1">Create a split bill or escrow to get started.</p>
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-medium text-foreground">Active Transactions</h2>
-        <button className="text-[#10367D] text-sm font-medium hover:underline">View all</button>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-medium text-foreground">Active Transactions</h2>
+          {transactions.length > 0 && (
+            <button className="text-[#10367D] text-sm font-medium hover:underline">View all</button>
+          )}
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {transactions.map((tx) => {
-          const isEscrow = tx.type === 'Escrow';
+      {transactions.length === 0 ? (
+        <div className="bg-[#f9f9f9] rounded-3xl p-2 min-h-[100px]">
+          <EmptyActivityView />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {transactions.map((tx) => {
+            const isEscrow = tx.type === 'Escrow';
           const typeColor = isEscrow ? "bg-[#e6f5ea] text-green-600" : "bg-[#e5ecf6] text-[#10367D]";
           
           let statusColor = "text-amber-500";
@@ -163,6 +188,7 @@ export function ActiveTransactions() {
           );
         })}
       </div>
+    )}
     </div>
   );
 }

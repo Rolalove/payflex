@@ -32,7 +32,7 @@ export function AuthLeftPanel() {
   }, []);
 
   return (
-    <div className="hidden lg:flex flex-col justify-between w-[45%] max-w-[560px] bg-linear-to-b from-[#0f2d72] to-[#2563eb] rounded-3xl px-10 py-5 text-white relative overflow-hidden transition-all duration-500 gap-y-10">
+    <div className="hidden lg:flex flex-col justify-between w-[45%] max-w-[560px] bg-linear-to-b from-[#0f2d72] to-[#2563eb] rounded-3xl p-10 text-white relative overflow-hidden transition-all duration-500 gap-y-10">
       <div>
        <Image src="/FlexPayLogo-white.svg" alt="FlexPay Logo" width={122} height={32} />
       </div>
@@ -53,7 +53,7 @@ export function AuthLeftPanel() {
         <h2 className="text-2xl font-medium mb-3 transition-opacity duration-300">
           {slides[currentSlide].title}
         </h2>
-        <p className="text-blue-100 font-medium text-lg leading-relaxed transition-opacity duration-300">
+        <p className="text-blue-100 font-medium text-base leading-relaxed transition-opacity duration-300">
           {slides[currentSlide].description}
         </p>
       </div>

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import Script from "next/script";
 import "./globals.css";
+import { AuthProvider } from "@/src/providers/AuthProvider";
 
 const neueMontreal = localFont({
   src: [
@@ -53,7 +55,17 @@ export default function RootLayout({
       lang="en"
       className={`${neueMontreal.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
+      {/* Interswitch Web Checkout – load once for the entire app */}
+      <Script
+        id="interswitch-inline-checkout"
+        src="https://newwebpay.qa.interswitchng.com/inline-checkout.js"
+        strategy="afterInteractive"
+      />
     </html>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { LuCopy, LuCircleCheck, LuShieldCheck, LuCircleAlert } from 'react-icons/lu';
+import { LuCircleCheck, LuShieldCheck, LuCircleAlert, LuLoader } from 'react-icons/lu';
 import { supabase } from '@/src/utils/supabase/client';
 import Link from 'next/link';
+import { handlePayment } from '@/src/components/ui/InterswitchCheckout';
+
 
 export default function GuestPaymentPage({ params }: { params: Promise<{ token: string }> }) {
   const resolvedParams = React.use(params);
@@ -14,76 +16,106 @@ export default function GuestPaymentPage({ params }: { params: Promise<{ token: 
   const [isPaying, setIsPaying] = useState(false);
   const [hasPaid, setHasPaid] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_transaction_by_token', { token_uuid: token });
+
+      if (error) throw error;
+      console.log("Fetched guest payment data:", data);
+      if (!data || data.length === 0) throw new Error("Link invalid or expired");
+
+      const record = data[0];
+      const newTransaction = {
+        id: record.transaction_id,
+        type: record.type,
+        status: record.status,
+        title: record.title,
+        target_amount: record.target_amount,
+        current_amount: record.current_amount
+      };
+      const newParticipant = {
+        id: record.participant_id,
+        name: record.participant_name,
+        email: record.participant_email,
+        amount_owed: record.participant_amount_owed,
+        amount_paid: record.participant_amount_paid
+      };
+
+      setTransaction(newTransaction);
+      setParticipant(newParticipant);
+      
+      if (newParticipant.amount_paid >= newParticipant.amount_owed && newParticipant.amount_owed > 0) {
+        setHasPaid(true);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const { data, error } = await supabase
-          .rpc('get_transaction_by_token', { token_uuid: token });
-
-        if (error) throw error;
-        console.log("Fetched guest payment data:", data);
-        if (!data || data.length === 0) throw new Error("Link invalid or expired");
-
-        const record = data[0];
-        const newTransaction = {
-          id: record.transaction_id,
-          type: record.type,
-          status: record.status,
-          title: record.title,
-          target_amount: record.target_amount,
-          current_amount: record.current_amount
-        };
-        const newParticipant = {
-          id: record.participant_id,
-          name: record.participant_name,
-          email: record.participant_email,
-          amount_owed: record.participant_amount_owed,
-          amount_paid: record.participant_amount_paid
-        };
-
-        setTransaction(newTransaction);
-        setParticipant(newParticipant);
-        
-        if (newParticipant.amount_paid >= newParticipant.amount_owed && newParticipant.amount_owed > 0) {
-          setHasPaid(true);
-        }
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    }
     fetchData();
   }, [token]);
 
-  const handleMarkAsPaid = async () => {
-    setIsPaying(true);
-    try {
-      // 1. Update participant status
-      const { error: updateError } = await supabase
-        .from('transaction_participants')
-        .update({ 
-          amount_paid: participant.amount_owed,
-          paid_at: new Date().toISOString()
-        })
-        .eq('id', participant.id);
-
-      if (updateError) throw updateError;
-
-      setHasPaid(true);
-    } catch (err) {
-      console.error("Payment error:", err);
-      alert("Failed to confirm payment. Please try again.");
-    } finally {
-      setIsPaying(false);
+  // Poll for window.webpayCheckout (loaded via layout Script tag)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (typeof (window as any).webpayCheckout === 'function') {
+      setIsScriptLoaded(true);
+      return;
     }
+    const check = setInterval(() => {
+      if (typeof (window as any).webpayCheckout === 'function') {
+        setIsScriptLoaded(true);
+        clearInterval(check);
+      }
+    }, 500);
+    return () => clearInterval(check);
+  }, []);
+
+  const handleInterswitchPay = () => {
+    if (!participant || !transaction) return;
+
+    const txnRef = `FP-GUEST-${token.slice(0, 8)}-${Date.now()}`;
+
+    setIsPaying(true);
+    handlePayment({
+      amountNaira: participant.amount_owed,
+      payItemName: `Split Bill: ${transaction.title}`,
+      txnRef,
+      // Pass the participant row ID so the SERVER updates the DB on success
+      participantId: participant.id,
+      custEmail: participant.email || undefined,
+      onSuccess: () => {
+        // The server has already updated transaction_participants via the service role key.
+        // We just need to update the UI by re-fetching the data.
+        fetchData().then(() => {
+          setHasPaid(true);
+          setIsPaying(false);
+        });
+      },
+      onPending: () => {
+        alert('Bank is still processing. Please check back shortly.');
+        setIsPaying(false);
+      },
+      onFailure: (errorMsg) => {
+        alert(errorMsg || 'Payment could not be verified. Please contact support.');
+        setIsPaying(false);
+      },
+    });
   };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="animate-pulse text-[#10367D] font-medium">Loading payment details...</div>
+        <div className="animate-pulse text-[#10367D] font-medium flex items-center gap-3">
+          <LuLoader className="animate-spin" />
+          Loading payment details...
+        </div>
       </div>
     );
   }
@@ -117,7 +149,7 @@ export default function GuestPaymentPage({ params }: { params: Promise<{ token: 
              <div className="w-8 h-8 bg-[#10367D] rounded-lg"></div>
              <span className="text-2xl font-bold text-[#10367D] tracking-tight">FlexPay</span>
            </div>
-           <p className="text-gray-500 text-sm font-medium">Secure Payments & Escrow</p>
+           <p className="text-gray-500 text-sm font-medium uppercase tracking-widest px-1">Safe • Secure • Verified</p>
         </div>
 
         {hasPaid ? (
@@ -126,37 +158,40 @@ export default function GuestPaymentPage({ params }: { params: Promise<{ token: 
             <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6 text-green-500">
               <LuCircleCheck size={40} />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Received!</h2>
-            <p className="text-gray-500 mb-4 px-4">Thank you, {participant.name || 'Participant'}. Your contribution of ₦{participant.amount_owed.toLocaleString()} to "{transaction.title}" has been confirmed.</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Completed!</h2>
+            <p className="text-gray-500 mb-4 px-4">
+              {transaction.status === 'Action Needed' || transaction.status === 'Released' || (transaction.current_amount >= transaction.target_amount)
+                ? "Your payment is complete! All participants have paid."
+                : `Thank you, ${participant.name || 'Participant'}. Your contribution of ₦${participant.amount_owed.toLocaleString()} has been confirmed. Waiting for other participants to complete their payments.`}
+            </p>
             <div className="bg-gray-50 rounded-2xl p-4 mb-8 text-left space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Transaction ID</span>
-                <span className="font-mono text-gray-900">{transaction.id.slice(0, 8).toUpperCase()}</span>
+                <span className="text-gray-500 font-medium">Transaction ID</span>
+                <span className="font-mono text-gray-900 font-bold">{transaction.id.slice(0, 8).toUpperCase()}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Date Paid</span>
-                <span className="text-gray-900 font-medium">{new Date().toLocaleDateString()}</span>
+                <span className="text-gray-500 font-medium">Date Paid</span>
+                <span className="text-gray-900 font-bold">{new Date().toLocaleDateString()}</span>
               </div>
             </div>
-            <p className="text-xs text-gray-400">Funds are held securely by FlexPay.</p>
             
             <div className="mt-10 pt-8 border-t border-gray-100 flex flex-col items-center">
               <div className="bg-[#f0f7ff] rounded-3xl p-6 w-full text-left mb-6 border border-blue-50">
                 <h4 className="text-[#10367D] font-bold text-sm mb-2 flex items-center gap-2">
                   <span className="w-6 h-6 bg-[#10367D] rounded-lg flex items-center justify-center text-white text-[10px]">FP</span>
-                  Make your own splits?
+                  Want to track your payments?
                 </h4>
                 <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                  Join <span className="font-bold">FlexPay</span> to manage your own shared bills, track expenses, and use secure escrow for your services.
+                  Join <span className="font-bold text-[#10367D]">FlexPay</span> for free to manage shared bills, track your expenses, and use secure escrow.
                 </p>
                 <Link 
                   href={`/signup?email=${encodeURIComponent(participant.email || '')}`}
                   className="w-full inline-flex items-center justify-center bg-[#10367D] text-white py-3.5 rounded-2xl text-sm font-bold hover:bg-blue-900 transition-all shadow-lg shadow-blue-100 active:scale-[0.98]"
                 >
-                  Sign up for Free
+                  Create FlexPay Account
                 </Link>
               </div>
-              <p className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Powered by FlexPay</p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Powered by FlexPay</p>
             </div>
           </div>
         ) : (
@@ -164,64 +199,103 @@ export default function GuestPaymentPage({ params }: { params: Promise<{ token: 
             <div className="absolute top-0 left-0 w-full h-2 bg-[#10367D]"></div>
             
             <div className="p-8 md:p-10">
-              <div className="flex justify-between items-start mb-10">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10 pb-8 border-b border-gray-50">
                 <div>
                   <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest ${isEscrow ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                    {transaction.type} INVITE
+                    {transaction.type} REQUEST
                   </span>
-                  <h1 className="text-2xl font-bold text-gray-900 mt-3 leading-tight">{transaction.title}</h1>
+                  <h1 className="text-2xl font-bold text-gray-900 mt-3 leading-tight tracking-tight">{transaction.title}</h1>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">DUE AMOUNT</p>
-                  <p className="text-3xl font-bold text-gray-900 tracking-tight">
-                    <span className="text-lg font-medium">₦</span>{participant.amount_owed.toLocaleString()}
+                <div className="md:text-right bg-gray-50 px-5 py-3 rounded-2xl border border-gray-100">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">DUE AMOUNT</p>
+                  <p className="text-2xl font-bold text-[#10367D] tracking-tight">
+                    <span className="text-sm font-medium">₦</span>{participant.amount_owed.toLocaleString()}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100">
-                  <p className="text-[10px] font-bold text-[#10367D] mb-4 uppercase tracking-widest">PAYMENT INSTRUCTIONS</p>
-                  <p className="text-sm text-gray-600 mb-6 leading-relaxed">
-                    Transfer exactly <span className="font-bold text-gray-900">₦{participant.amount_owed.toLocaleString()}</span> to the account below.
-                  </p>
-                  
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500">Bank</span>
-                      <span className="font-bold text-gray-900">Interswitch</span>
-                    </div>
-                    <div className="h-px bg-blue-100/50"></div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-500">Account Number</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900 text-base">1039488785</span>
-                        <button className="p-1.5 bg-white rounded-lg border border-blue-100 text-[#10367D] hover:bg-blue-50 transition-colors">
-                          <LuCopy size={16} />
-                        </button>
+              {isEscrow ? (
+                <div className="space-y-6">
+                  <div className="bg-[#f0f7ff] rounded-3xl p-8 border border-blue-50 relative overflow-hidden text-center">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#10367D]/5 rounded-full -mr-16 -mt-16 blur-xl"></div>
+                    
+                    <div className="relative z-10 flex flex-col items-center">
+                      <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-[#10367D] shadow-sm mb-4">
+                        <LuShieldCheck size={32} />
                       </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Secure Your Transaction</h3>
+                      <p className="text-sm text-gray-700 mb-8 leading-relaxed font-medium">
+                        To participate in this <span className="font-bold">Escrow</span> and manage the funds securely, you must join the FlexPay platform.
+                      </p>
+                      
+                      <Link 
+                        href={`/signup?email=${encodeURIComponent(participant.email || '')}&redirect=/dashboard/escrow/${transaction.id}`}
+                        className="w-full py-5 rounded-3xl text-lg font-bold text-white shadow-xl shadow-blue-200/50 transition-all active:scale-[0.98] border-b-4 border-blue-900 flex items-center justify-center gap-3 bg-[#10367D] hover:bg-blue-800"
+                      >
+                        Join FlexPay to Participate
+                      </Link>
                     </div>
                   </div>
+                  
+                  <div className="flex justify-center items-center gap-2 px-2 text-[11px] text-gray-500 font-bold uppercase tracking-wider">
+                    <LuShieldCheck size={16} className="text-[#34A853]" />
+                    <span>Secure Escrow Protection</span>
+                  </div>
                 </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-[#f0f7ff] rounded-3xl p-8 border border-blue-50 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#10367D]/5 rounded-full -mr-16 -mt-16 blur-xl"></div>
+                    
+                    <div className="relative z-10">
+                      <p className="text-[10px] font-bold text-[#10367D] mb-4 uppercase tracking-widest flex items-center gap-2">
+                         <LuShieldCheck size={14} className="text-[#34A853]" />
+                         SECURE CHECKOUT
+                      </p>
+                      <p className="text-sm text-gray-700 mb-10 leading-relaxed font-medium">
+                        You are about to pay <span className="font-bold text-gray-900">₦{participant.amount_owed.toLocaleString()}</span> securely through Interswitch. 
+                      </p>
+                      
+                      <button 
+                        onClick={handleInterswitchPay}
+                        disabled={isPaying || !isScriptLoaded}
+                        className={`w-full py-5 rounded-3xl text-lg font-bold text-white shadow-xl shadow-blue-200/50 transition-all active:scale-[0.98] border-b-4 border-blue-900 flex items-center justify-center gap-3 ${isPaying || !isScriptLoaded ? 'bg-gray-400 cursor-not-allowed border-gray-500' : 'bg-[#10367D] hover:bg-blue-800'}`}
+                      >
+                        {!isScriptLoaded ? (
+                          <>
+                            <LuLoader size={20} className="animate-spin" />
+                            Verifying...
+                          </>
+                        ) : isPaying ? (
+                          <>
+                            <LuLoader size={20} className="animate-spin" />
+                            Processing...
+                          </>
+                        ) : 'Pay with Interswitch'}
+                      </button>
+                      
+                      <p className="text-[10px] text-gray-400 mt-6 text-center font-bold italic">
+                        Verve • Mastercard • Visa • Bank Transfer
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-3 px-2 text-xs text-gray-400 font-medium">
-                  <LuShieldCheck size={18} className="text-green-500" />
-                  <span>Funds are protected by FlexPay Escrow until delivery.</span>
+                  <div className="flex items-center gap-3 px-2 text-[11px] text-gray-500 font-bold uppercase tracking-wider">
+                    <LuShieldCheck size={18} className="text-[#34A853]" />
+                    <span>Funds are protected by FlexPay Escrow</span>
+                  </div>
                 </div>
-
-                <button 
-                  onClick={handleMarkAsPaid}
-                  disabled={isPaying}
-                  className={`w-full py-5 rounded-3xl text-lg font-bold text-white shadow-lg shadow-blue-200/50 transition-all active:scale-95 ${isPaying ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#10367D] hover:bg-blue-900'}`}
-                >
-                  {isPaying ? 'Confirming...' : 'I Have Transferred'}
-                </button>
-              </div>
+              )}
             </div>
             
-            <div className="bg-gray-50 p-6 text-center border-t border-gray-100">
-              <p className="text-xs text-gray-500">
-                Facing issues? <a href="#" className="text-[#10367D] font-bold hover:underline">Chat with Support</a>
+            <div className="bg-[#f8faff] p-6 text-center border-t border-gray-100 flex flex-col items-center gap-2">
+               <div className="flex items-center gap-1.5 grayscale opacity-50">
+                  <div className="w-8 h-4 bg-gray-400 rounded-sm"></div>
+                  <div className="w-8 h-4 bg-gray-400 rounded-sm"></div>
+                  <div className="w-8 h-4 bg-gray-400 rounded-sm"></div>
+               </div>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                Safe Payment via Interswitch Secure
               </p>
             </div>
           </div>
@@ -229,11 +303,12 @@ export default function GuestPaymentPage({ params }: { params: Promise<{ token: 
         
         {/* Footer */}
         <div className="text-center px-8">
-           <p className="text-[10px] text-gray-400 leading-relaxed max-w-[280px] mx-auto uppercase tracking-widest font-bold">
-             FlexPay Nigeria Ltd. Licensed by CBN as a Payment Solution Provider.
+           <p className="text-[9px] text-gray-400 leading-relaxed max-w-[280px] mx-auto uppercase tracking-[0.2em] font-bold">
+             FlexPay Nigeria Ltd. Licensed by CBN • © 2026 FlexPay
            </p>
         </div>
       </div>
     </div>
   );
 }
+

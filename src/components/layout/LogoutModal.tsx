@@ -14,47 +14,32 @@ export function LogoutModal({ isOpen, onClose, onConfirm }: LogoutModalProps) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-      {/* Backdrop with enhanced blur */}
+      {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-500"
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-300"
         onClick={onClose}
       />
       
-      {/* Modal Content - Premium Glassmorphism Look */}
-      <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl rounded-[2.5rem] w-full max-w-sm p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] relative z-10 animate-in zoom-in-95 slide-in-from-bottom-8 duration-500 border border-white/20">
-        <button 
-          onClick={onClose}
-          className="absolute top-8 right-8 p-2 text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-full transition-all duration-300"
-        >
-          <LuX size={20} />
-        </button>
-
+      {/* Modal Content */}
+      <div className="bg-white rounded-4xl w-full max-w-sm p-8 shadow-2xl relative z-10 animate-in zoom-in-95 duration-200">
         <div className="text-center">
-          <div className="relative w-20 h-20 bg-linear-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/10 rounded-3xl flex items-center justify-center mx-auto mb-8 text-red-500 shadow-inner group overflow-hidden">
-            <div className="absolute inset-0 bg-red-400/10 scale-0 group-hover:scale-105 transition-transform duration-500 rounded-full blur-2xl" />
-            <LuLogOut size={36} className="relative z-10 animate-pulse-slow" />
-          </div>
-          
-          <h2 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-3 tracking-tight">
-            See you soon?
-          </h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm mb-10 leading-relaxed max-w-[240px] mx-auto">
-            Logging out will end your current session. You&apos;ll need to verify your account next time you visit.
+          <h3 className="text-2xl font-black text-gray-900 mb-2 tracking-tight">Confirm Logout</h3>
+          <p className="text-gray-500 font-medium text-sm mb-10 leading-relaxed">
+            Are you sure you want to log out? You&apos;ll need to log in again to access your dashboard.
           </p>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <button 
               onClick={onConfirm}
-              className="w-full py-5 rounded-3xl font-bold bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 shadow-xl shadow-gray-200 dark:shadow-none transition-all duration-300 active:scale-95 flex items-center justify-center gap-2 group"
+              className="w-full py-4 rounded-2xl font-black bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-100 transition-all active:scale-[0.98]"
             >
-              <span>Yes, Log Out</span>
-              <LuLogOut size={18} className="group-hover:translate-x-1 transition-transform" />
+              Yes, Log Out
             </button>
             <button 
               onClick={onClose}
-              className="w-full py-5 rounded-3xl font-bold bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300 active:scale-95 border border-gray-100 dark:border-gray-700"
+              className="w-full py-4 rounded-2xl font-black bg-gray-50 text-gray-500 hover:bg-gray-100 transition-all active:scale-[0.98]"
             >
-              Cancel
+              No, Stay Logged In
             </button>
           </div>
         </div>

@@ -142,19 +142,28 @@ export function CreateSplitBillModal({ isOpen, onClose }: { isOpen: boolean, onC
   const addParticipant = (userOrEmail: any, isMember: boolean) => {
     const isEmail = typeof userOrEmail === 'string' && userOrEmail.includes('@');
     
+    // Check if we're adding someone already added
+    const existing = participants.find(p => 
+      (isMember && p.id === userOrEmail.id) || 
+      (p.email && p.email === (isMember ? userOrEmail.email : userOrEmail))
+    );
+    if (existing) {
+      setNewParticipant('');
+      setSearchResults([]);
+      return;
+    }
+
     const newP: Participant = {
-      id: isMember ? userOrEmail.id : Date.now().toString(),
+      id: isMember ? userOrEmail.id : `guest-${Date.now()}`,
       name: isMember ? userOrEmail.full_name : (isEmail ? userOrEmail : userOrEmail),
-      avatarLetter: isMember ? userOrEmail.full_name.charAt(0).toUpperCase() : userOrEmail.charAt(0).toUpperCase(),
+      avatarLetter: isMember ? (userOrEmail.full_name || userOrEmail.email).charAt(0).toUpperCase() : userOrEmail.charAt(0).toUpperCase(),
       avatarColor: isMember ? 'bg-blue-600' : 'bg-amber-400',
       amount: 0,
       isMember: isMember,
       email: isMember ? userOrEmail.email : (isEmail ? userOrEmail : null),
     };
     
-    if (!participants.find(p => p.id === newP.id || (p.email && p.email === newP.email))) {
-      setParticipants([...participants, newP]);
-    }
+    setParticipants([...participants, newP]);
     setNewParticipant('');
     setSearchResults([]);
   };
@@ -241,8 +250,23 @@ export function CreateSplitBillModal({ isOpen, onClose }: { isOpen: boolean, onC
       if (partError) throw partError;
  
       const invitedOnes = insertedParts.filter(p => p.user_id === null && p.amount_owed > 0);
-      setInvitees(invitedOnes);
-      setStep(4);
+
+      // 3. Trigger Invitation Emails for Guest Participants
+      if (invitedOnes.length > 0) {
+        console.log("[INVITE] Triggering manual emails for guests:", invitedOnes.length);
+        // We don't await this to keep the UI snappy, but we fire the requests
+        Promise.all(invitedOnes.map((guest: any) => 
+          supabase.functions.invoke('send-invite', {
+            body: guest
+          })
+        )).catch(err => console.error("[INVITE] Error triggering manual emails:", err));
+
+        setInvitees(invitedOnes);
+        setStep(4);
+      } else {
+        onClose();
+        router.push('/dashboard');
+      }
     } catch (err) {
       console.error(err);
       alert('Error creating Split Bill');
@@ -589,7 +613,7 @@ export function CreateSplitBillModal({ isOpen, onClose }: { isOpen: boolean, onC
                   >
                     {isLoading ? (
                       <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    ) : 'Confirm & Send Invites'}
+                    ) : (participants.some(p => !p.isMember) ? 'Confirm & Send Invites' : 'Create Split Bill')}
                   </button>
                 </div>
             </div>
@@ -603,7 +627,7 @@ export function CreateSplitBillModal({ isOpen, onClose }: { isOpen: boolean, onC
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
                 </div>
                 <h3 className="text-[20px] font-bold text-gray-900 mt-6 tracking-tight">Invitation Emails Sent!</h3>
-                <p className="text-gray-500 text-[13px] mt-2 mb-8 font-medium leading-relaxed max-w-[280px]">
+                <p className="text-gray-500 text-center mx-auto text-[13px] mt-2 mb-8 font-medium leading-relaxed max-w-[280px]">
                   Individual payment links have been sent to participants' emails. 
                   You can also copy the links below to share them manually.
                 </p>

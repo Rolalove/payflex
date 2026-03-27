@@ -59,10 +59,10 @@ export function CreateEscrowModal({ isOpen, onClose }: { isOpen: boolean, onClos
         .from('transactions')
         .insert({
           type: 'Escrow',
-          status: 'Funds Held',
+          status: 'Awaiting Payment',
           title: title || 'Website Redesign for ParaFunds',
           target_amount: parseFloat(amount || '0'),
-          current_amount: role === 'client' ? parseFloat(amount || '0') : 0, // If client deposits initially
+          current_amount: 0,
           creator_id: user.id
         })
         .select()
@@ -79,7 +79,7 @@ export function CreateEscrowModal({ isOpen, onClose }: { isOpen: boolean, onClos
           email: user.email,
           role_type: role,
           amount_owed: role === 'client' ? parseFloat(amount || '0') : 0,
-          amount_paid: role === 'client' ? parseFloat(amount || '0') : 0,
+          amount_paid: 0,
         },
         {
           transaction_id: tx.id,
@@ -100,7 +100,14 @@ export function CreateEscrowModal({ isOpen, onClose }: { isOpen: boolean, onClos
       if (partError) throw partError;
  
       const partnerPart = insertedParts.find(p => p.user_id === null);
-      if (partnerPart) setInviteToken(partnerPart.invite_token);
+      if (partnerPart) {
+        console.log("[INVITE] Triggering manual email for escrow partner");
+        supabase.functions.invoke('send-invite', {
+          body: partnerPart
+        }).catch(err => console.error("[INVITE] Error triggering escrow invite:", err));
+        
+        setInviteToken(partnerPart.invite_token);
+      }
       
       setCreatedTxId(tx.id);
       setStep(4);
@@ -284,19 +291,13 @@ export function CreateEscrowModal({ isOpen, onClose }: { isOpen: boolean, onClos
               <label className="block text-[15px] text-gray-900 mb-2 font-medium tracking-tight">{role === 'client' ? 'Add Service Provider' : 'Add Client'}</label>
               <div className="w-full bg-white rounded-2xl py-2 px-2 flex items-center shadow-sm border border-transparent focus-within:ring-2 focus-within:ring-[#10367D]/20 min-h-[56px]">
                 {selectedPartner ? (
-                  <div className="flex items-center gap-1.5 bg-blue-50 rounded-full py-1.5 pl-1.5 pr-2.5 ml-2 mr-2 border border-blue-100">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center text-[10px] font-bold text-white">
-                      {selectedPartner.full_name?.charAt(0) || 'U'}
+                  <div className={`flex items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2.5 ml-2 mr-2 border ${selectedPartner.id ? 'bg-blue-50 border-blue-100' : 'bg-amber-50 border-amber-100'}`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${selectedPartner.id ? 'bg-blue-600' : 'bg-amber-500'}`}>
+                      {selectedPartner.id ? (selectedPartner.full_name?.charAt(0) || 'U') : 'G'}
                     </div>
-                    <span className="text-xs font-semibold text-[#10367D] tracking-tight">{selectedPartner.full_name}</span>
-                    <button onClick={() => setSelectedPartner(null)} className="text-blue-400 hover:text-blue-600 ml-1"><LuX size={12}/></button>
-                  </div>
-                ) : partner && validateEmail(partner) && !isSearching && searchResults.length === 0 ? (
-                  <div className="flex items-center gap-1.5 bg-amber-50 rounded-full py-1.5 pl-1.5 pr-2.5 ml-2 mr-2 border border-amber-100">
-                    <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center text-[10px] font-bold text-white">G</div>
-                    <span className="text-xs font-semibold text-amber-700 tracking-tight">{partner}</span>
-                    <span className="text-[9px] text-amber-500 font-bold ml-1 uppercase underline underline-offset-2">Guest</span>
-                    <button onClick={() => setPartner('')} className="text-amber-400 hover:text-amber-600 ml-1"><LuX size={12}/></button>
+                    <span className={`text-xs font-semibold tracking-tight ${selectedPartner.id ? 'text-[#10367D]' : 'text-amber-700'}`}>{selectedPartner.full_name}</span>
+                    {!selectedPartner.id && <span className="text-[9px] text-amber-500 font-bold ml-1 uppercase underline underline-offset-2">Guest</span>}
+                    <button onClick={() => setSelectedPartner(null)} className={`${selectedPartner.id ? 'text-blue-400 hover:text-blue-600' : 'text-amber-400 hover:text-amber-600'} ml-1`}><LuX size={12}/></button>
                   </div>
                 ) : (
                   <input 
@@ -362,7 +363,17 @@ export function CreateEscrowModal({ isOpen, onClose }: { isOpen: boolean, onClos
                       <span className="text-[10px] text-gray-400 font-medium">Invitation links are sent to the email provided.</span>
                     </p>
                   ) : (
-                    <p className="text-xs text-amber-600 font-bold">Add "{partner}" as Guest Participant</p>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setSelectedPartner({ full_name: partner, email: partner, id: null });
+                        setSearchResults([]);
+                      }}
+                      className="w-full text-left p-4 hover:bg-amber-50 transition-colors group"
+                    >
+                      <p className="text-xs text-amber-600 font-bold group-hover:text-amber-700 uppercase tracking-tight">Add "{partner}" as Guest Participant</p>
+                      <p className="text-[10px] text-amber-400 mt-1 font-medium">Click to confirm guest invitation</p>
+                    </button>
                   )}
                 </div>
               )}

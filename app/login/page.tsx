@@ -8,13 +8,33 @@ import { supabase } from "@/src/utils/supabase/client";
 import { AuthLeftPanel } from "@/src/features/auth/components/AuthLeftPanel";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) alert(error.message);
+      else window.location.href = "/dashboard";
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) console.error("Error logging in:", error.message);
@@ -44,15 +64,18 @@ export default function LoginPage() {
           <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto mt-16 lg:mt-0">
             <h2 className="text-3xl font-medium text-[#1A181B] mb-10 tracking-tight">Login to your account</h2>
 
-            <form className="space-y-4">
+            <form className="space-y-4" onSubmit={handleLogin}>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none text-gray-400">
                   <LuPhone size={18} />
                 </div>
                 <input
-                  type="tel"
-                  placeholder="Enter phone number"
+                  type="email"
+                  placeholder="Enter email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-white border border-gray-100 rounded-full py-4 pl-12 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  required
                 />
               </div>
 
@@ -63,7 +86,10 @@ export default function LoginPage() {
                 <input
                   type="password"
                   placeholder="Enter password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-white border border-gray-100 rounded-full py-4 pl-12 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
+                  required
                 />
                 <button
                   type="button"
@@ -82,9 +108,10 @@ export default function LoginPage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full bg-[#10367D] hover:bg-blue-900 text-white font-medium rounded-full py-4 transition-colors"
+                  disabled={loading}
+                  className="w-full bg-[#10367D] hover:bg-blue-900 text-white font-medium rounded-full py-4 transition-colors disabled:opacity-50"
                 >
-                  Login
+                  {loading ? "Logging in..." : "Login"}
                 </button>
               </div>
             </form>

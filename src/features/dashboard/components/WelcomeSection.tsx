@@ -2,22 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/src/utils/supabase/client";
+import { useAuth } from "@/src/providers/AuthProvider";
 import { CreateSplitBillModal } from "./CreateSplitBillModal";
 import { CreateEscrowModal } from "@/src/features/escrow/components/CreateEscrowModal";
 
 export function WelcomeSection() {
-  const [user, setUser] = useState<any>(null);
+  const { user, isLoading } = useAuth();
   const [greeting, setGreeting] = useState("Good Morning");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEscrowModalOpen, setIsEscrowModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user) setUser(data.user);
-      setIsLoading(false);
-    });
-
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Good Morning");
     else if (hour < 18) setGreeting("Good Afternoon");
@@ -26,14 +21,13 @@ export function WelcomeSection() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col space-y-4 lg:space-y-0 lg:flex-row lg:items-center justify-between mb-6">
         <div>
           {isLoading ? (
             <div className="h-8 w-48 bg-gray-200 animate-pulse rounded-md mb-2"></div>
           ) : (
             <h2 className="text-2xl font-medium text-foreground">{greeting}, {user?.user_metadata?.full_name?.split(" ")[0] || "User"}</h2>
           )}
-          <p className="text-sm text-primary font-medium mt-1">Dashboard</p>
         </div>
         <div className="flex items-center gap-3">
           <button 
