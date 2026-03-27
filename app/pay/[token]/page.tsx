@@ -61,6 +61,22 @@ export default function GuestPaymentPage({ params }: { params: Promise<{ token: 
     fetchData();
   }, [token]);
 
+  useEffect(() => {
+    async function checkUserAndRedirect() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && transaction) {
+        // If user is logged in, redirect to dashboard details
+        const type = transaction.type.toLowerCase() === 'escrow' ? 'escrow' : 'split-bill';
+        const redirectUrl = `/dashboard/${type}/${transaction.id}`;
+        console.log("[PAY] Authenticated user detected, redirecting to:", redirectUrl);
+        window.location.href = redirectUrl;
+      }
+    }
+    if (!isLoading && transaction) {
+      checkUserAndRedirect();
+    }
+  }, [isLoading, transaction]);
+
   // Poll for window.webpayCheckout (loaded via layout Script tag)
   useEffect(() => {
     if (typeof window === 'undefined') return;

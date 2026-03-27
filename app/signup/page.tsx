@@ -8,12 +8,19 @@ import { AuthLeftPanel } from "@/src/features/auth/components/AuthLeftPanel";
 
 export default function SignupPage() {
 
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const inviteToken = searchParams?.get('token');
+
   const handleGoogleLogin = async () => {
     try {
+      // If we have an invite token, redirect to /pay/[token] after login
+      // /pay/[token] will handle the final redirection to the transaction dashboard
+      const nextParam = inviteToken ? `/pay/${inviteToken}` : '/dashboard';
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextParam)}`,
         },
       });
       if (error) console.error("Error logging in:", error.message);
@@ -23,8 +30,9 @@ export default function SignupPage() {
   };
 
   useEffect(() => {
-    // Session checks can go here
-  }, []);
+    // If a token is in the URL, we could optionally show a welcome message
+    console.log("Signup with token:", inviteToken);
+  }, [inviteToken]);
   return (
     <div className="h-screen bg-[#ebebeb] flex justify-center p-4 lg:p-6">
       <div className="flex w-full max-w-[1200px] h-full bg-white lg:bg-transparent rounded-3xl shadow-sm lg:shadow-none overflow-hidden lg:overflow-visible">

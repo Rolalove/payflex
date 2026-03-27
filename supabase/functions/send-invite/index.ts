@@ -17,11 +17,9 @@ Deno.serve(async (req: Request) => {
     const { email, name, invite_token, role_type } = record;
     const protocol = Deno.env.get('ENV') === 'local' ? 'http' : 'https';
     const domain = Deno.env.get('PUBLIC_DOMAIN') || 'payflex.vercel.app';
-    const inviteLink = `${protocol}://${domain}/pay/${invite_token}`;
+    const invitePath = isEscrow ? `/signup?token=${invite_token}` : `/pay/${invite_token}`;
+    const inviteLink = `${protocol}://${domain}${invitePath}`;
     
-    const isEscrow = ['client', 'provider'].includes(role_type);
-    const typeLabel = isEscrow ? 'Escrow Transaction' : 'Split Bill';
-
     const subject = isEscrow 
       ? `Invitation: Secure Your Escrow Transaction on PayFlex`
       : `Invite: You've been invited to a ${typeLabel} on PayFlex`;
@@ -30,9 +28,9 @@ Deno.serve(async (req: Request) => {
       ? `You've been invited to participate in a secure <strong>Escrow Transaction</strong> on PayFlex. Since escrow involves protected fund holding, platform registration is required to manage the transaction and confirm completion.`
       : `You've been invited to participate in a <strong>${typeLabel}</strong> on PayFlex. You can view the details and complete your portion of the payment securely through our platform.`;
     
-    const ctaText = isEscrow ? 'Join & Secure Transaction' : 'View Details & Pay';
+    const ctaText = isEscrow ? 'Sign Up to Participate' : 'View Details & Pay';
 
-    console.log(`[INVITE] Preparing to send to ${email} for ${typeLabel}`);
+    console.log(`[INVITE] Preparing to send to ${email} for ${typeLabel}. Link: ${inviteLink}`);
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -60,15 +58,6 @@ Deno.serve(async (req: Request) => {
                 ${ctaText}
               </a>
             </div>
-            
-            <p style="color: #999; font-size: 12px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #f0f0f0; text-align: center;">
-              If the button doesn't work, copy and paste this link into your browser: <br/> 
-              <span style="color: #10367D; word-break: break-all;">${inviteLink}</span>
-            </p>
-            
-            <p style="color: #999; font-size: 10px; text-align: center; margin-top: 20px; text-transform: uppercase; letter-spacing: 1px;">
-              Secure • Verified • Escrow Protected
-            </p>
           </div>
         `,
       }),

@@ -462,28 +462,8 @@ export function CreateEscrowModal({ isOpen, onClose }: { isOpen: boolean, onClos
             </div>
                      <h3 className="text-2xl font-bold text-gray-900 mb-2">Invitation Email Sent!</h3>
             <p className="text-gray-500 mb-6 max-w-sm mx-auto text-sm">
-              We've sent an invitation email to your partner with the secure payment link.
-              You can also copy the link manually below.
+              We've sent an invitation email to your partner with a secure link to join PayFlex and participate in this escrow transaction.
             </p>
-            
-            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm mb-8 text-left">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">SECURE PAYMENT LINK</p>
-              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl gap-3">
-                <code className="text-[11px] text-[#10367D] font-mono truncate flex-1">
-                  {window.location.origin}/pay/{inviteToken}
-                </code>
-                <button 
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/pay/${inviteToken}`);
-                    alert('Secure link copied!');
-                  }}
-                  className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
-                  title="Copy Link"
-                >
-                  <LuCopy size={18} />
-                </button>
-              </div>
-            </div>
 
             <div className="pt-8 space-y-3">
               <button 
